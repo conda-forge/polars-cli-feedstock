@@ -29,12 +29,14 @@ build:
       - if: target_platform == "linux-ppc64le"
         then:
           - export CARGO_BUILD_RUSTFLAGS="${CARGO_BUILD_RUSTFLAGS} -C link-arg=-fuse-ld=bfd"
-          # The resulting binary is large enough that jemalloc's intra-object
-          # `bl` calls exceed the 24-bit ±32 MB PPC64 branch reach, and GNU ld
-          # cannot stub them all. `-mlongcall` emits indirect calls instead.
+          # gcc splits jemalloc's functions into .text.<fn>/.text.unlikely.<fn>,
+          # and ld groups all cold text far from hot text. The binary is large
+          # enough that the resulting same-TU `bl` calls exceed the 24-bit
+          # ±32 MB PPC64 branch reach, which gcc assumed was safe. Keeping each
+          # function in one section makes those calls short again.
           # jemalloc-sys derives its configure CFLAGS from the cc crate, which
           # honours the target-suffixed variable the rust activation sets.
-          - export CFLAGS_powerpc64le_unknown_linux_gnu="${CFLAGS} -mlongcall"
+          - export CFLAGS_powerpc64le_unknown_linux_gnu="${CFLAGS} -fno-reorder-blocks-and-partition"
       - if: unix
         then:
           - cargo auditable install --locked --no-track --bins --root ${{ PREFIX }} --path .
