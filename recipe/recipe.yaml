@@ -19,6 +19,16 @@ build:
       # ethnum 1.5.0 as pinned in Cargo.lock transmutes `()` into `TryFromIntError`,
       # which no longer compiles since that type stopped being zero-sized. Fixed in 1.5.1.
       - cargo update --package ethnum --precise 1.5.3
+      # jemalloc_sys' C objects, built by the ppc64le cross-gcc, carry
+      # PLT-sequence relocations that the lld rustc links with via
+      # `-fuse-ld=lld` cannot resolve. `-C link-arg` is appended after rustc's
+      # own flags and gcc honours the last `-fuse-ld`, so this picks GNU ld,
+      # which handles them. Append to CARGO_BUILD_RUSTFLAGS rather than
+      # RUSTFLAGS: the two are mutually exclusive, and the rust activation
+      # script puts the $PREFIX rpath flags in CARGO_BUILD_RUSTFLAGS.
+      - if: target_platform == "linux-ppc64le"
+        then:
+          - export CARGO_BUILD_RUSTFLAGS="${CARGO_BUILD_RUSTFLAGS} -C link-arg=-fuse-ld=bfd"
       - if: unix
         then:
           - cargo auditable install --locked --no-track --bins --root ${{ PREFIX }} --path .
